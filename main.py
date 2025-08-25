@@ -1,25 +1,43 @@
 import streamlit as st
-from utils import print_message
 from langchain_core.messages import ChatMessage
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_ollama import ChatOllama
+
+from utils import print_message
 
 st.set_page_config(page_title="나만의 Translator 💬", page_icon="💬")
 st.title("나만의 Translator 💬")
 
-# Session State 메시지 리스트 초기화(일관된 key 사용 및 구조적 관리)
+# 세션 상태 메시지 초기화
 if "messages" not in st.session_state:
     st.session_state["messages"] = []
 
-print_message()
+# Ollama LLM 객체 한 번만 초기화
+llm = ChatOllama(model="llama3.2:3b", temperature=0)
 
-# 사용자 입력 처리 및 세션 상태 업데이트
-user_input = st.chat_input("메세지를 입력해 주세요.")
+# Prompt 템플릿 정의
+prompt_template_str = """
+당신은 친절한 번역가입니다. 사용자의 질문에 간결하게 답변하세요.
+{question}
+"""
+prompt_template = ChatPromptTemplate.from_template(prompt_template_str)
+
+
+user_input = st.chat_input("메시지를 입력해 주세요.")
+
+print_message()  # 기존 메시지 화면에 출력
+
 if user_input:
-    # 메시지 추가: "user" 역할 추가
+    # 사용자 메시지 저장 및 화면 출력
     st.chat_message("user").write(user_input)
-    st.session_state["messages"].append(ChatMessage(role="user", content=user_input))
+    user_msg = ChatMessage(role="user", content=user_input)
+    st.session_state["messages"].append(user_msg)
 
-    # 예시: assistant 응답 메시지 (실전 서비스에선 모델 inference로 교체 가능)
+    # prompt 템플릿에 질문 변수 할당하여 체인 호출
+    output = llm.invoke(prompt_template.format_prompt(question=user_input).to_string())
+
+    # AI 응답 메시지 저장 및 화면 출력
     with st.chat_message("assistant"):
-        assistant_reply = f"MY INPUT: {user_input}"
-        st.write(assistant_reply)
-        st.session_state["messages"].append(ChatMessage(role="assistant", content=assistant_reply))
+        st.write(output.content)
+        assistant_msg = ChatMessage(role="assistant", content=output.content)
+        st.session_state["messages"].append(assistant_msg)
